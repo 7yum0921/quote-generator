@@ -722,13 +722,13 @@
                 it: []
             };
             
-            // 收集項目資料（簡化欄位名稱）
+            // 收集項目資料
             document.querySelectorAll('.item-row').forEach(row => {
                 const name = row.querySelector('.item-name').value;
                 const quantity = row.querySelector('.item-quantity').value;
                 const price = row.querySelector('.item-price').value;
                 
-                if (name || quantity !== '1' || price) { // 只儲存有資料的項目
+                if (name || quantity !== '1' || price) {
                     quoteData.it.push({
                         n: name,
                         q: quantity,
@@ -737,59 +737,73 @@
                 }
             });
             
-            try {
-                // 先嘗試不包含簽名的版本
-                const basicData = JSON.stringify(quoteData);
-                console.log('基本資料大小:', basicData.length, 'bytes');
+            // 處理簽名 - 只有在簽名存在且不會讓URL過長時才包含
+            const providerCanvas = document.getElementById('providerSignature');
+            if (!isCanvasEmpty(providerCanvas)) {
+                // 創建壓縮版本的簽名
+                const compressedSig = compressSignature(providerCanvas);
                 
-                let finalData = basicData;
-                let hasSignatures = false;
+                // 測試加入簽名後的大小
+                const testData = {...quoteData, ps: compressedSig};
+                const testSize = JSON.stringify(testData).length;
                 
-                // 嘗試添加簽名（高度壓縮）
-                const providerCanvas = document.getElementById('providerSignature');
-                const clientCanvas = document.getElementById('clientSignature');
-                
-                if (!isCanvasEmpty(providerCanvas)) {
-                    // 創建小尺寸的簽名圖片
-                    const tempCanvas = document.createElement('canvas');
-                    const tempCtx = tempCanvas.getContext('2d');
-                    tempCanvas.width = 150; // 大幅縮小
-                    tempCanvas.height = 75;
-                    tempCtx.drawImage(providerCanvas, 0, 0, 150, 75);
-                    
-                    const compressedSig = tempCanvas.toDataURL('image/jpeg', 0.3); // 高壓縮
-                    const dataWithSig = JSON.stringify({...quoteData, ps: compressedSig});
-                    
-                    if (dataWithSig.length < 6000) { // 保守的長度限制
-                        finalData = dataWithSig;
-                        hasSignatures = true;
-                    }
+                if (testSize < 4000) { // 保守估計
+                    quoteData.ps = compressedSig;
                 }
+            }
+            
+            try {
+                // 生成最終的分享連結
+                const jsonStr = JSON.stringify(quoteData);
+                const encodedData = btoa(jsonStr);
+                const shareUrl = `${window.location.origin}${window.location.pathname}?view=client#${encodedData}`;
                 
-                const compressedData = btoa(finalData).replace(/=/g, '');
-                
-                if (compressedData.length > 6000) {
-                    // 如果還是太長，只發送基本資料
-                    const basicCompressed = btoa(JSON.stringify(quoteData)).replace(/=/g, '');
-                    const shareUrl = `${window.location.origin}${window.location.pathname}?view=client#${basicCompressed}`;
+                // 檢查最終URL長度
+                if (shareUrl.length > 8000) {
+                    // 移除簽名重試
+                    delete quoteData.ps;
+                    const fallbackJsonStr = JSON.stringify(quoteData);
+                    const fallbackEncodedData = btoa(fallbackJsonStr);
+                    const fallbackShareUrl = `${window.location.origin}${window.location.pathname}?view=client#${fallbackEncodedData}`;
                     
-                    copyToClipboard(shareUrl);
-                    alert('分享連結已生成！\n\n⚠️ 注意：由於資料量較大，客戶收到的報價單將不包含您的簽名，客戶簽名後您仍需要下載完整版本。');
+                    if (fallbackShareUrl.length > 8000) {
+                        alert('報價單內容過多，無法生成分享連結。\n\n建議：\n• 簡化項目名稱\n• 縮短備註內容\n• 減少項目數量');
+                        return;
+                    }
+                    
+                    copyToClipboard(fallbackShareUrl);
+                    alert('分享連結已生成！\n\n注意：由於內容較多，此連結不包含您的簽名。客戶簽名後，您需要下載完整的PDF版本。');
                 } else {
-                    const shareUrl = `${window.location.origin}${window.location.pathname}?view=client#${compressedData}`;
                     copyToClipboard(shareUrl);
-                    
-                    if (hasSignatures) {
-                        alert('分享連結已生成！\n\n✅ 包含您的簽名，客戶可以直接查看完整報價單。');
+                    if (quoteData.ps) {
+                        alert('分享連結已生成！\n\n✅ 包含完整內容和您的簽名。');
                     } else {
-                        alert('分享連結已生成！\n\n💡 建議：您可以先簽名再分享，讓客戶看到完整的報價單。');
+                        alert('分享連結已生成！\n\n建議：您可以先簽名再分享，讓客戶看到更完整的報價單。');
                     }
                 }
                 
             } catch (error) {
-                alert('生成分享連結失敗，請檢查資料是否完整');
+                alert('生成分享連結失敗，請重試或簡化報價單內容。');
                 console.error('分享失敗:', error);
             }
+        }
+        
+        // 簽名壓縮函數
+        function compressSignature(canvas) {
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            // 設定較小的尺寸但保持比例
+            tempCanvas.width = 120;
+            tempCanvas.height = 60;
+            
+            // 繪製壓縮後的簽名
+            tempCtx.fillStyle = 'white';
+            tempCtx.fillRect(0, 0, 120, 60);
+            tempCtx.drawImage(canvas, 0, 0, 120, 60);
+            
+            // 使用高壓縮JPEG格式
+            return tempCanvas.toDataURL('image/jpeg', 0.6);
         }
         
         // 檢查canvas是否為空
@@ -902,77 +916,43 @@
             const hashData = window.location.hash.substring(1);
             const queryData = urlParams.get('data');
             
-            const data = hashData || queryData; // 優先使用fragment資料
+            const data = hashData || queryData;
             
             if (data) {
                 try {
-                    // 添加錯誤處理和詳細日誌
-                    console.log('載入資料，長度:', data.length);
+                    const quoteData = JSON.parse(atob(data));
                     
-                    // 嘗試解碼
-                    let decodedData;
-                    try {
-                        decodedData = atob(data + '==='.substring(0, (4 - data.length % 4) % 4));
-                    } catch (decodeError) {
-                        console.error('Base64解碼失敗:', decodeError);
-                        throw new Error('資料格式錯誤');
-                    }
-                    
-                    console.log('解碼後的JSON:', decodedData.substring(0, 200) + '...');
-                    
-                    // 嘗試解析JSON
-                    let quoteData;
-                    try {
-                        quoteData = JSON.parse(decodedData);
-                    } catch (jsonError) {
-                        console.error('JSON解析失敗:', jsonError);
-                        throw new Error('資料解析錯誤');
-                    }
-                    
-                    console.log('成功載入報價資料:', Object.keys(quoteData));
-                    
-                    // 如果是客戶檢視模式
                     if (viewMode === 'client') {
                         setupClientView(quoteData);
                     } else {
-                        // 管理員模式：填入資料到表單
                         loadQuoteData(quoteData);
                     }
                 } catch (e) {
                     console.error('載入分享資料失敗:', e);
                     if (viewMode === 'client') {
-                        // 顯示友好的錯誤頁面
                         document.body.innerHTML = `
                             <div style="display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: Arial, sans-serif;">
                                 <div style="text-align: center; max-width: 500px; padding: 40px;">
                                     <h2 style="color: #ef4444; margin-bottom: 20px;">⚠️ 連結載入失敗</h2>
                                     <p style="color: #6b7280; line-height: 1.6; margin-bottom: 20px;">
-                                        很抱歉，無法載入報價單資料。這可能是因為：<br>
-                                        • 連結已損壞或不完整<br>
-                                        • 資料量過大<br>
-                                        • 網路傳輸問題
+                                        無法載入報價單資料，請聯繫服務提供者重新發送連結。
                                     </p>
-                                    <p style="color: #374151; font-weight: 600;">
-                                        請聯繫服務提供者重新發送報價單連結。
-                                    </p>
-                                    <button onclick="window.location.reload()" style="margin-top: 20px; background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer;">
-                                        重新載入頁面
+                                    <button onclick="window.location.href=window.location.origin+window.location.pathname" 
+                                            style="background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer;">
+                                        返回首頁
                                     </button>
                                 </div>
                             </div>
                         `;
-                    } else {
-                        alert('無法載入報價單資料，請檢查連結是否完整。');
                     }
                 }
             } else if (viewMode === 'client') {
-                // 客戶模式但沒有資料
                 document.body.innerHTML = `
                     <div style="display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: Arial, sans-serif;">
                         <div style="text-align: center; max-width: 500px; padding: 40px;">
-                            <h2 style="color: #f59e0b; margin-bottom: 20px;">📄 找不到報價單資料</h2>
+                            <h2 style="color: #f59e0b; margin-bottom: 20px;">📄 找不到報價單</h2>
                             <p style="color: #6b7280; line-height: 1.6;">
-                                請確認您使用的是完整的報價單連結，或聯繫服務提供者重新發送。
+                                請確認您使用的是完整的報價單連結。
                             </p>
                         </div>
                     </div>
