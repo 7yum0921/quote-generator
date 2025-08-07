@@ -737,88 +737,29 @@
                 }
             });
             
-            // 處理簽名 - 適度壓縮但保持品質
+            // 收集簽名 - 無論大小都包含
             const providerCanvas = document.getElementById('providerSignature');
             if (!isCanvasEmpty(providerCanvas)) {
-                quoteData.ps = compressSignatureEfficiently(providerCanvas);
+                quoteData.ps = providerCanvas.toDataURL('image/jpeg', 0.8);
             }
             
+            // 生成分享連結 - 保證成功
             try {
-                // 使用更高效的壓縮方式
-                const compressedQuoteData = compressQuoteData(quoteData);
-                
-                // 使用多種編碼方式確保相容性
-                let shareUrl;
-                
-                // 方法1：使用URL Fragment (首選)
-                const fragmentUrl = `${window.location.origin}${window.location.pathname}?view=client#${compressedQuoteData}`;
-                
-                // 方法2：如果Fragment太長，拆分資料
-                if (fragmentUrl.length > 12000) {
-                    // 將簽名單獨處理
-                    const basicData = {...quoteData};
-                    delete basicData.ps;
-                    
-                    const basicCompressed = btoa(JSON.stringify(basicData));
-                    const signatureCompressed = quoteData.ps ? btoa(quoteData.ps) : '';
-                    
-                    shareUrl = `${window.location.origin}${window.location.pathname}?view=client&d=${basicCompressed}&s=${signatureCompressed}`;
-                } else {
-                    shareUrl = fragmentUrl;
-                }
+                const jsonStr = JSON.stringify(quoteData);
+                const encodedData = btoa(jsonStr);
+                const shareUrl = `${window.location.origin}${window.location.pathname}?view=client#${encodedData}`;
                 
                 copyToClipboard(shareUrl);
                 
                 if (quoteData.ps) {
-                    alert('分享連結已生成！✅\n\n包含完整報價單內容和您的簽名。\n客戶可直接查看並簽名確認。');
+                    alert('分享連結已生成！✅\n\n包含完整報價單內容和您的簽名。');
                 } else {
-                    alert('分享連結已生成！📋\n\n包含完整報價單內容。\n建議：您可以先簽名再分享。');
+                    alert('分享連結已生成！📋\n\n包含完整報價單內容。');
                 }
                 
             } catch (error) {
                 console.error('分享失敗:', error);
-                alert('分享連結生成失敗，請重試。如問題持續請聯繫技術支援。');
-            }
-        }
-        
-        // 高效簽名壓縮
-        function compressSignatureEfficiently(canvas) {
-            const tempCanvas = document.createElement('canvas');
-            const tempCtx = tempCanvas.getContext('2d');
-            
-            // 保持合理尺寸，確保簽名清晰度
-            tempCanvas.width = 200;
-            tempCanvas.height = 100;
-            
-            // 白色背景
-            tempCtx.fillStyle = 'white';
-            tempCtx.fillRect(0, 0, 200, 100);
-            
-            // 繪製簽名
-            tempCtx.drawImage(canvas, 0, 0, 200, 100);
-            
-            // 使用較好的壓縮品質
-            return tempCanvas.toDataURL('image/jpeg', 0.8);
-        }
-        
-        // 高效資料壓縮
-        function compressQuoteData(data) {
-            const jsonStr = JSON.stringify(data);
-            
-            // 使用多重壓縮策略
-            try {
-                // 方法1: 直接base64
-                const base64Data = btoa(jsonStr);
-                
-                // 方法2: 如果有LZ壓縮可用則使用，否則降級到base64
-                if (typeof LZString !== 'undefined') {
-                    return LZString.compressToEncodedURIComponent(jsonStr);
-                }
-                
-                return base64Data;
-            } catch (e) {
-                // 降級方案
-                return btoa(encodeURIComponent(jsonStr));
+                alert('分享連結生成失敗，請重試。');
             }
         }
         
@@ -928,126 +869,53 @@
             const urlParams = new URLSearchParams(window.location.search);
             const viewMode = urlParams.get('view');
             
-            if (viewMode === 'client') {
-                loadClientData(urlParams);
-            } else {
-                loadAdminData(urlParams);
-            }
-        });
-        
-        // 載入客戶端資料
-        function loadClientData(urlParams) {
-            let quoteData = null;
-            
-            try {
-                // 方法1: 從URL Fragment讀取
-                const hashData = window.location.hash.substring(1);
-                if (hashData) {
-                    try {
-                        // 嘗試多種解碼方式
-                        let decodedStr;
-                        
-                        if (typeof LZString !== 'undefined' && hashData.indexOf('%') !== -1) {
-                            // LZ壓縮格式
-                            decodedStr = LZString.decompressFromEncodedURIComponent(hashData);
-                        } else {
-                            // 標準base64格式
-                            decodedStr = atob(hashData);
-                        }
-                        
-                        quoteData = JSON.parse(decodedStr);
-                    } catch (e) {
-                        console.log('Fragment解碼失敗，嘗試其他方法');
-                    }
-                }
-                
-                // 方法2: 從分割的參數讀取
-                if (!quoteData) {
-                    const basicData = urlParams.get('d');
-                    const signatureData = urlParams.get('s');
-                    
-                    if (basicData) {
-                        quoteData = JSON.parse(atob(basicData));
-                        
-                        if (signatureData && signatureData !== '') {
-                            try {
-                                quoteData.ps = atob(signatureData);
-                            } catch (e) {
-                                console.log('簽名資料解碼失敗');
-                            }
-                        }
-                    }
-                }
-                
-                // 方法3: 舊格式相容性
-                if (!quoteData) {
-                    const legacyData = urlParams.get('data');
-                    if (legacyData) {
-                        try {
-                            quoteData = JSON.parse(decodeURIComponent(atob(legacyData)));
-                        } catch (e) {
-                            quoteData = JSON.parse(atob(legacyData));
-                        }
-                    }
-                }
-                
-                if (quoteData) {
-                    setupClientView(quoteData);
-                } else {
-                    showClientError('找不到報價單', '請確認您使用的是完整的報價單連結。');
-                }
-                
-            } catch (error) {
-                console.error('載入客戶資料失敗:', error);
-                showClientError('連結載入失敗', '無法載入報價單資料，請聯繫服務提供者重新發送連結。');
-            }
-        }
-        
-        // 載入管理員資料
-        function loadAdminData(urlParams) {
+            // 檢查URL fragment中的資料
             const hashData = window.location.hash.substring(1);
             const queryData = urlParams.get('data');
+            
             const data = hashData || queryData;
             
             if (data) {
                 try {
-                    let quoteData;
+                    const quoteData = JSON.parse(atob(data));
                     
-                    // 嘗試多種解碼方式
-                    if (typeof LZString !== 'undefined' && data.indexOf('%') !== -1) {
-                        quoteData = JSON.parse(LZString.decompressFromEncodedURIComponent(data));
+                    if (viewMode === 'client') {
+                        setupClientView(quoteData);
                     } else {
-                        quoteData = JSON.parse(atob(data));
+                        loadQuoteData(quoteData);
                     }
-                    
-                    loadQuoteData(quoteData);
                 } catch (e) {
-                    console.error('載入管理員資料失敗:', e);
-                    alert('無法載入報價單資料，請檢查連結是否完整。');
+                    console.error('載入分享資料失敗:', e);
+                    if (viewMode === 'client') {
+                        document.body.innerHTML = `
+                            <div style="display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: Arial, sans-serif; background: #f8fafc;">
+                                <div style="text-align: center; max-width: 500px; padding: 40px; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                    <h2 style="color: #ef4444; margin-bottom: 20px;">⚠️ 連結載入失敗</h2>
+                                    <p style="color: #6b7280; line-height: 1.6; margin-bottom: 20px;">
+                                        無法載入報價單資料，請聯繫服務提供者重新發送連結。
+                                    </p>
+                                    <button onclick="window.location.href=window.location.origin+window.location.pathname" 
+                                            style="background: #3b82f6; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer;">
+                                        返回首頁
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    }
                 }
-            }
-        }
-        
-        // 顯示客戶端錯誤
-        function showClientError(title, message) {
-            document.body.innerHTML = `
-                <div style="display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: Arial, sans-serif; background: #f8fafc;">
-                    <div style="text-align: center; max-width: 500px; padding: 40px; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                        <div style="width: 80px; height: 80px; background: #fee2e2; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
-                            <span style="font-size: 32px;">⚠️</span>
+            } else if (viewMode === 'client') {
+                document.body.innerHTML = `
+                    <div style="display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: Arial, sans-serif; background: #f8fafc;">
+                        <div style="text-align: center; max-width: 500px; padding: 40px; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                            <h2 style="color: #f59e0b; margin-bottom: 20px;">📄 找不到報價單</h2>
+                            <p style="color: #6b7280; line-height: 1.6;">
+                                請確認您使用的是完整的報價單連結。
+                            </p>
                         </div>
-                        <h2 style="color: #ef4444; margin-bottom: 16px; font-size: 24px;">${title}</h2>
-                        <p style="color: #6b7280; line-height: 1.6; margin-bottom: 24px; font-size: 16px;">
-                            ${message}
-                        </p>
-                        <button onclick="window.location.href=window.location.origin+window.location.pathname" 
-                                style="background: #3b82f6; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 500;">
-                            返回首頁
-                        </button>
                     </div>
-                </div>
-            `;
-        }
+                `;
+            }
+        });
         
         // 設置客戶檢視模式
         function setupClientView(quoteData) {
