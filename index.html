@@ -737,30 +737,74 @@
                 }
             });
             
-            // 收集簽名 - 無論大小都包含
+            // 收集簽名
             const providerCanvas = document.getElementById('providerSignature');
             if (!isCanvasEmpty(providerCanvas)) {
                 quoteData.ps = providerCanvas.toDataURL('image/jpeg', 0.8);
             }
             
-            // 生成分享連結 - 保證成功
+            // 生成分享連結
             try {
                 const jsonStr = JSON.stringify(quoteData);
-                const encodedData = btoa(jsonStr);
+                const encodedData = btoa(unescape(encodeURIComponent(jsonStr))); // 修復中文編碼問題
                 const shareUrl = `${window.location.origin}${window.location.pathname}?view=client#${encodedData}`;
                 
                 copyToClipboard(shareUrl);
                 
+                // 替換彈跳視窗為自動消失通知
                 if (quoteData.ps) {
-                    alert('分享連結已生成！✅\n\n包含完整報價單內容和您的簽名。');
+                    showToast('分享連結已生成！包含完整內容和簽名 ✅', 'success');
                 } else {
-                    alert('分享連結已生成！📋\n\n包含完整報價單內容。');
+                    showToast('分享連結已生成！包含完整內容 📋', 'success');
                 }
                 
             } catch (error) {
                 console.error('分享失敗:', error);
-                alert('分享連結生成失敗，請重試。');
+                showToast('分享連結生成失敗，請重試', 'error');
             }
+        }
+        
+        // 自動消失的通知系統
+        function showToast(message, type = 'info') {
+            // 創建通知元素
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 10000;
+                max-width: 400px;
+                padding: 16px 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                font-size: 14px;
+                font-weight: 500;
+                color: white;
+                transform: translateX(100%);
+                transition: transform 0.3s ease;
+                ${type === 'success' ? 'background: #10b981;' : ''}
+                ${type === 'error' ? 'background: #ef4444;' : ''}
+                ${type === 'info' ? 'background: #3b82f6;' : ''}
+            `;
+            
+            toast.innerHTML = message;
+            document.body.appendChild(toast);
+            
+            // 滑入動畫
+            setTimeout(() => {
+                toast.style.transform = 'translateX(0)';
+            }, 100);
+            
+            // 自動消失
+            setTimeout(() => {
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    if (toast.parentNode) {
+                        toast.parentNode.removeChild(toast);
+                    }
+                }, 300);
+            }, 3000);
         }
         
         // 檢查canvas是否為空
@@ -776,7 +820,7 @@
         function copyToClipboard(text) {
             if (navigator.clipboard) {
                 navigator.clipboard.writeText(text).then(() => {
-                    alert('分享連結已複製到剪貼板！\n\n客戶可以透過此連結查看報價單並進行簽名確認。');
+                    // 成功複製，不需要額外提示
                 }).catch(() => {
                     fallbackCopyTextToClipboard(text);
                 });
@@ -798,9 +842,9 @@
             
             try {
                 document.execCommand('copy');
-                alert('分享連結已複製到剪貼板！\n\n客戶可以透過此連結查看報價單並進行簽名確認。');
+                // 成功複製，不需要額外提示
             } catch (err) {
-                alert('無法複製連結，請手動複製：\n\n' + text);
+                showToast('無法複製連結，請手動複製', 'error');
             }
             
             document.body.removeChild(textArea);
@@ -877,7 +921,23 @@
             
             if (data) {
                 try {
-                    const quoteData = JSON.parse(atob(data));
+                    // 修復中文解碼問題
+                    let quoteData;
+                    try {
+                        // 嘗試新的解碼方式（支援中文）
+                        const decodedStr = decodeURIComponent(escape(atob(data)));
+                        quoteData = JSON.parse(decodedStr);
+                    } catch (e) {
+                        // 降級到舊的解碼方式
+                        try {
+                            const decodedStr = atob(data);
+                            quoteData = JSON.parse(decodedStr);
+                        } catch (e2) {
+                            throw new Error('無法解碼資料');
+                        }
+                    }
+                    
+                    console.log('成功載入報價資料:', quoteData);
                     
                     if (viewMode === 'client') {
                         setupClientView(quoteData);
@@ -894,6 +954,9 @@
                                     <p style="color: #6b7280; line-height: 1.6; margin-bottom: 20px;">
                                         無法載入報價單資料，請聯繫服務提供者重新發送連結。
                                     </p>
+                                    <p style="color: #9ca3af; font-size: 12px; margin-bottom: 20px;">
+                                        錯誤詳情：${e.message}
+                                    </p>
                                     <button onclick="window.location.href=window.location.origin+window.location.pathname" 
                                             style="background: #3b82f6; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer;">
                                         返回首頁
@@ -901,6 +964,8 @@
                                 </div>
                             </div>
                         `;
+                    } else {
+                        showToast('無法載入報價單資料，請檢查連結是否完整', 'error');
                     }
                 }
             } else if (viewMode === 'client') {
@@ -1149,7 +1214,7 @@
                 
                 // 顯示下載完成提示
                 setTimeout(() => {
-                    alert('PDF下載完成！\n\n請將此檔案回傳給服務提供者以完成確認流程。');
+                    showToast('PDF下載完成！請將檔案回傳給服務提供者', 'success');
                 }, 500);
                 
             }).catch(error => {
