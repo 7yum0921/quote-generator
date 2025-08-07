@@ -711,59 +711,67 @@
         function shareQuote() {
             // 收集所有表單資料
             const quoteData = {
-                quoteNumber: document.getElementById('quoteNumber').value,
-                quoteDate: document.getElementById('quoteDate').value,
-                projectName: document.getElementById('projectName').value,
-                providerName: document.getElementById('providerName').value,
-                clientName: document.getElementById('clientName').value,
-                providerContact: document.getElementById('providerContact').value,
-                clientContact: document.getElementById('clientContact').value,
-                notes: document.getElementById('notes').value,
-                items: [],
-                providerSignature: '',
-                clientSignature: ''
+                qn: document.getElementById('quoteNumber').value,
+                qd: document.getElementById('quoteDate').value,
+                pn: document.getElementById('projectName').value,
+                pr: document.getElementById('providerName').value,
+                cl: document.getElementById('clientName').value,
+                prc: document.getElementById('providerContact').value,
+                clc: document.getElementById('clientContact').value,
+                nt: document.getElementById('notes').value,
+                it: [],
+                ps: '',
+                cs: ''
             };
             
-            // 收集項目資料
+            // 收集項目資料（簡化欄位名稱）
             document.querySelectorAll('.item-row').forEach(row => {
                 const item = {
-                    name: row.querySelector('.item-name').value,
-                    quantity: row.querySelector('.item-quantity').value,
-                    price: row.querySelector('.item-price').value
+                    n: row.querySelector('.item-name').value,
+                    q: row.querySelector('.item-quantity').value,
+                    p: row.querySelector('.item-price').value
                 };
-                quoteData.items.push(item);
+                if (item.n || item.q !== '1' || item.p) { // 只儲存有資料的項目
+                    quoteData.it.push(item);
+                }
             });
             
             // 收集簽名資料
             const providerCanvas = document.getElementById('providerSignature');
             const clientCanvas = document.getElementById('clientSignature');
             
-            // 檢查是否有簽名內容
-            const providerCtx = providerCanvas.getContext('2d');
-            const clientCtx = clientCanvas.getContext('2d');
-            
             if (!isCanvasEmpty(providerCanvas)) {
-                quoteData.providerSignature = providerCanvas.toDataURL();
+                // 壓縮簽名圖片
+                quoteData.ps = providerCanvas.toDataURL('image/png', 0.5); // 降低品質以減少大小
             }
             if (!isCanvasEmpty(clientCanvas)) {
-                quoteData.clientSignature = clientCanvas.toDataURL();
+                quoteData.cs = clientCanvas.toDataURL('image/png', 0.5);
             }
             
             try {
-                const encodedData = btoa(encodeURIComponent(JSON.stringify(quoteData)));
-                const shareUrl = `${window.location.origin}${window.location.pathname}?view=client&data=${encodedData}`;
+                // 使用JSON壓縮和URL fragment而非query parameter
+                const compressedData = btoa(JSON.stringify(quoteData)).replace(/=/g, ''); // 移除padding
                 
-                if (navigator.share) {
-                    navigator.share({
-                        title: `報價單 - ${quoteData.projectName || '專案'}`,
-                        url: shareUrl
-                    }).catch(err => {
-                        // 如果分享失敗，則複製到剪貼板
-                        copyToClipboard(shareUrl);
-                    });
+                // 檢查長度
+                if (compressedData.length > 7000) {
+                    // 如果還是太長，移除簽名資料
+                    delete quoteData.ps;
+                    delete quoteData.cs;
+                    const compressedDataNoSig = btoa(JSON.stringify(quoteData)).replace(/=/g, '');
+                    
+                    if (compressedDataNoSig.length > 7000) {
+                        alert('報價單資料過多，無法生成分享連結。\n建議簡化項目描述或備註內容。');
+                        return;
+                    }
+                    
+                    const shareUrl = `${window.location.origin}${window.location.pathname}?view=client#${compressedDataNoSig}`;
+                    copyToClipboard(shareUrl);
+                    alert('分享連結已生成！\n\n注意：由於資料量較大，客戶需要重新簽名。');
                 } else {
+                    const shareUrl = `${window.location.origin}${window.location.pathname}?view=client#${compressedData}`;
                     copyToClipboard(shareUrl);
                 }
+                
             } catch (error) {
                 alert('生成分享連結失敗，請檢查資料是否完整');
                 console.error('分享失敗:', error);
@@ -874,12 +882,17 @@
         // 載入分享的資料
         window.addEventListener('load', function() {
             const urlParams = new URLSearchParams(window.location.search);
-            const data = urlParams.get('data');
             const viewMode = urlParams.get('view');
+            
+            // 檢查URL fragment中的資料
+            const hashData = window.location.hash.substring(1);
+            const queryData = urlParams.get('data');
+            
+            const data = hashData || queryData; // 優先使用fragment資料
             
             if (data) {
                 try {
-                    const quoteData = JSON.parse(decodeURIComponent(atob(data)));
+                    const quoteData = JSON.parse(atob(data + '==='.substring(0, (4 - data.length % 4) % 4))); // 補充padding
                     
                     // 如果是客戶檢視模式
                     if (viewMode === 'client') {
@@ -890,6 +903,9 @@
                     }
                 } catch (e) {
                     console.error('無法載入分享資料:', e);
+                    if (viewMode === 'client') {
+                        alert('無法載入報價單資料，請檢查連結是否完整。');
+                    }
                 }
             }
         });
@@ -947,9 +963,10 @@
             previewSection.appendChild(clientSignatureSection);
             
             // 顯示乙方簽名（如果有的話）
-            if (quoteData.providerSignature) {
+            const providerSig = quoteData.ps || quoteData.providerSignature;
+            if (providerSig) {
                 document.getElementById('providerSignatureDisplay').innerHTML = 
-                    `<img src="${quoteData.providerSignature}" style="max-width: 150px; max-height: 60px; border: 1px solid #d1d5db; border-radius: 4px;">`;
+                    `<img src="${providerSig}" style="max-width: 150px; max-height: 60px; border: 1px solid #d1d5db; border-radius: 4px;">`;
             }
         }
         
@@ -1102,16 +1119,19 @@
                 previewElement.style.cssText = originalStyle;
                 
                 // 取得報價單資訊
+                const hashData = window.location.hash.substring(1);
                 const urlParams = new URLSearchParams(window.location.search);
-                const data = urlParams.get('data');
+                const queryData = urlParams.get('data');
+                const data = hashData || queryData;
+                
                 let projectName = '專案';
                 let quoteNumber = 'Q001';
                 
                 if (data) {
                     try {
-                        const quoteData = JSON.parse(decodeURIComponent(atob(data)));
-                        projectName = quoteData.projectName || '專案';
-                        quoteNumber = quoteData.quoteNumber || 'Q001';
+                        const quoteData = JSON.parse(atob(data + '==='.substring(0, (4 - data.length % 4) % 4)));
+                        projectName = quoteData.pn || quoteData.projectName || '專案';
+                        quoteNumber = quoteData.qn || quoteData.quoteNumber || 'Q001';
                     } catch (e) {
                         console.error('無法解析報價單資料');
                     }
@@ -1134,7 +1154,29 @@
         
         // 載入報價資料的通用函數
         function loadQuoteData(quoteData) {
+            // 處理簡化的欄位名稱映射
+            const fieldMapping = {
+                'qn': 'quoteNumber',
+                'qd': 'quoteDate', 
+                'pn': 'projectName',
+                'pr': 'providerName',
+                'cl': 'clientName',
+                'prc': 'providerContact',
+                'clc': 'clientContact',
+                'nt': 'notes'
+            };
+            
             // 填入基本資料
+            Object.keys(fieldMapping).forEach(shortKey => {
+                if (quoteData[shortKey]) {
+                    const element = document.getElementById(fieldMapping[shortKey]);
+                    if (element) {
+                        element.value = quoteData[shortKey];
+                    }
+                }
+            });
+            
+            // 處理舊格式的向後相容性
             Object.keys(quoteData).forEach(key => {
                 const element = document.getElementById(key);
                 if (element && typeof quoteData[key] === 'string') {
@@ -1143,25 +1185,26 @@
             });
             
             // 載入項目資料
-            if (quoteData.items && quoteData.items.length > 0) {
+            const items = quoteData.it || quoteData.items || [];
+            if (items.length > 0) {
                 const itemsList = document.getElementById('itemsList');
                 itemsList.innerHTML = ''; // 清空現有項目
                 
-                quoteData.items.forEach(item => {
+                items.forEach(item => {
                     const itemRow = document.createElement('div');
                     itemRow.className = 'item-row';
                     itemRow.innerHTML = `
                         <div class="form-group">
                             <label>項目名稱</label>
-                            <input type="text" class="item-name" value="${item.name || ''}" placeholder="服務項目">
+                            <input type="text" class="item-name" value="${item.n || item.name || ''}" placeholder="服務項目">
                         </div>
                         <div class="form-group">
                             <label>數量</label>
-                            <input type="number" class="item-quantity" value="${item.quantity || 1}" min="1">
+                            <input type="number" class="item-quantity" value="${item.q || item.quantity || 1}" min="1">
                         </div>
                         <div class="form-group">
                             <label>單價</label>
-                            <input type="number" class="item-price" value="${item.price || 0}" placeholder="0">
+                            <input type="number" class="item-price" value="${item.p || item.price || 0}" placeholder="0">
                         </div>
                         <div class="form-group">
                             <label>金額</label>
@@ -1182,16 +1225,17 @@
             }
             
             // 載入簽名
-            if (quoteData.providerSignature) {
-                // 這裡可以載入乙方簽名到canvas
-                // 由於canvas載入圖片比較複雜，這裡先更新預覽
+            const providerSig = quoteData.ps || quoteData.providerSignature;
+            const clientSig = quoteData.cs || quoteData.clientSignature;
+            
+            if (providerSig) {
                 document.getElementById('providerSignaturePreview').innerHTML = 
-                    `<img src="${quoteData.providerSignature}" style="max-width: 150px; max-height: 60px;">`;
+                    `<img src="${providerSig}" style="max-width: 150px; max-height: 60px;">`;
             }
             
-            if (quoteData.clientSignature) {
+            if (clientSig) {
                 document.getElementById('clientSignaturePreview').innerHTML = 
-                    `<img src="${quoteData.clientSignature}" style="max-width: 150px; max-height: 60px;">`;
+                    `<img src="${clientSig}" style="max-width: 150px; max-height: 60px;">`;
             }
             
             updatePreview();
