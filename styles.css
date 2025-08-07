@@ -1,0 +1,335 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8fafc;
+    color: #334155;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.header h1 {
+    color: #1e293b;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.header p {
+    color: #64748b;
+}
+
+.main-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+}
+
+.form-section {
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.preview-section {
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    min-height: 600px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    color: #374151;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: border-color 0.2s;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.items-section h3 {
+    margin-bottom: 15px;
+    color: #1e293b;
+}
+
+.item-row {
+    display: grid;
+    grid-template-columns: 2fr 80px 120px 120px 40px;
+    gap: 10px;
+    align-items: end;
+    margin-bottom: 10px;
+    padding: 10px;
+    background: #f8fafc;
+    border-radius: 6px;
+}
+
+.add-item-btn {
+    background: #3b82f6;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-bottom: 15px;
+}
+
+.add-item-btn:hover {
+    background: #2563eb;
+}
+
+.remove-btn {
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 5px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.remove-btn:hover {
+    background: #dc2626;
+}
+
+.signature-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.signature-box {
+    border: 1px dashed #d1d5db;
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    cursor: pointer;
+    position: relative;
+    background: #f9fafb;
+}
+
+.signature-box:hover {
+    background: #f3f4f6;
+    border-color: #9ca3af;
+}
+
+.signature-canvas {
+    width: 100%;
+    height: 100%;
+    border-radius: 6px;
+}
+
+.signature-controls {
+    display: flex;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.clear-signature {
+    background: #6b7280;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 15px;
+    margin-top: 20px;
+    justify-content: center;
+}
+
+.btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background: #3b82f6;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #2563eb;
+}
+
+.btn-secondary {
+    background: #6b7280;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #4b5563;
+}
+
+.btn-success {
+    background: #10b981;
+    color: white;
+}
+
+.btn-success:hover {
+    background: #059669;
+}
+
+/* 預覽樣式 */
+.quote-preview {
+    font-family: Arial, sans-serif;
+    line-height: 1.5;
+}
+
+.quote-header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.quote-header h2 {
+    font-size: 24px;
+    margin-bottom: 10px;
+    color: #1e293b;
+}
+
+.quote-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.info-section h4 {
+    margin-bottom: 8px;
+    color: #374151;
+}
+
+.items-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+}
+
+.items-table th,
+.items-table td {
+    border: 1px solid #d1d5db;
+    padding: 8px;
+    text-align: left;
+}
+
+.items-table th {
+    background: #f3f4f6;
+    font-weight: 600;
+}
+
+.items-table .amount {
+    text-align: right;
+}
+
+.total-section {
+    text-align: right;
+    margin-bottom: 30px;
+}
+
+.total-line {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 5px;
+}
+
+.total-line span:first-child {
+    margin-right: 20px;
+    min-width: 100px;
+}
+
+.final-total {
+    font-weight: bold;
+    font-size: 18px;
+    border-top: 2px solid #374151;
+    padding-top: 8px;
+}
+
+.signature-preview {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    margin-top: 40px;
+}
+
+.signature-area {
+    text-align: center;
+}
+
+.signature-line {
+    border-top: 1px solid #374151;
+    margin-top: 60px;
+    padding-top: 8px;
+}
+
+@media (max-width: 768px) {
+    .main-content {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .item-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .quote-info {
+        grid-template-columns: 1fr;
+    }
+}
